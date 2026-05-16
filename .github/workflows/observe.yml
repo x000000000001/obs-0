@@ -1,0 +1,28 @@
+name: observe
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: observe
+        run: bash observe.sh
+
+      - name: commit
+        run: |
+          git config user.name "obs-0"
+          git config user.email "obs-0@users.noreply.github.com"
+          git add 0/log.ndjson
+          git diff --cached --quiet && exit 0
+          LAST=$(tail -1 0/log.ndjson)
+          EPOCH=$(python3 -c "import json,sys; b=json.loads(sys.stdin.read()).get('body'); print(b[2] if isinstance(b,list) and len(b)>2 else 'x')" <<< "$LAST")
+          STATUS=$(python3 -c "import json,sys; print('ok' if json.loads(sys.stdin.read()).get('ok') else 'fail')" <<< "$LAST")
+          git commit -m "${EPOCH}:${STATUS}"
+          git push
